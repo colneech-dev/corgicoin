@@ -1,5 +1,7 @@
 #include <boost/test/unit_test.hpp>
 
+#include <cstring>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -125,6 +127,78 @@ BOOST_AUTO_TEST_CASE(key_test1)
         BOOST_CHECK(rkey2.GetPubKey()  == key2.GetPubKey());
         BOOST_CHECK(rkey1C.GetPubKey() == key1C.GetPubKey());
         BOOST_CHECK(rkey2C.GetPubKey() == key2C.GetPubKey());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(key_copy_keeps_compression_flag)
+{
+    CKey a;
+    a.MakeNewKey(true);
+    BOOST_CHECK(a.IsCompressed());
+
+    CKey assigned; // a default-constructed key is uncompressed
+    assigned = a;
+    BOOST_CHECK_MESSAGE(assigned.IsCompressed(), "operator= dropped the compressed flag");
+    BOOST_CHECK(assigned.GetPubKey() == a.GetPubKey());
+
+    // copy-construct into zeroed storage, so a flag the copy constructor forgets reads as false
+    alignas(CKey) unsigned char buf[sizeof(CKey)];
+    memset(buf, 0, sizeof(buf));
+    CKey* copy = new (buf) CKey(a);
+    BOOST_CHECK_MESSAGE(copy->IsCompressed(), "copy constructor did not copy the compressed flag");
+    copy->~CKey();
+
+    // and an uncompressed key stays uncompressed
+    CKey u;
+    u.MakeNewKey(false);
+    CKey u2(u);
+    BOOST_CHECK(!u2.IsCompressed());
+}
+
+BOOST_AUTO_TEST_CASE(key_public_only_key_is_safe)
+{
+    CKey full;
+    full.MakeNewKey(false);
+    CKey pubonly;
+    BOOST_REQUIRE(pubonly.SetPubKey(full.GetPubKey()));
+
+    bool fCompr = false;
+    BOOST_CHECK_THROW(pubonly.GetSecret(fCompr), key_error); // used to dereference NULL
+    BOOST_CHECK(!pubonly.IsValid());                         // used to dereference NULL
+    BOOST_CHECK(full.IsValid());
+}
+
+BOOST_AUTO_TEST_CASE(key_empty_inputs_are_rejected)
+{
+    CKey k;
+    BOOST_CHECK(!k.SetPrivKey(CPrivKey()));
+    BOOST_CHECK(!k.SetPubKey(CPubKey()));
+    CKey full;
+    full.MakeNewKey(true);
+    BOOST_CHECK(!full.Verify(uint256(1), std::vector<unsigned char>()));
+}
+
+BOOST_AUTO_TEST_CASE(key_compact_signature_roundtrip_and_failure)
+{
+    CKey key;
+    key.MakeNewKey(true);
+    uint256 hash(12345);
+    std::vector<unsigned char> sig;
+    BOOST_REQUIRE(key.SignCompact(hash, sig));
+    CKey rec;
+    BOOST_CHECK(rec.SetCompactSignature(hash, sig));
+    BOOST_CHECK(rec.GetPubKey() == key.GetPubKey());
+
+    // bad shapes and signatures that do not recover a key must be rejected without leaking
+    // (the leak itself is checked with valgrind: failing calls used to leak an ECDSA_SIG each)
+    CKey bad;
+    BOOST_CHECK(!bad.SetCompactSignature(hash, std::vector<unsigned char>(64, 1)));
+    for (int i = 0; i < 200; i++)
+    {
+        std::vector<unsigned char> junk(65, (unsigned char)(0x11 + (i & 0x3f)));
+        junk[0] = 27 + (i & 3);
+        CKey k;
+        k.SetCompactSignature(hash, junk);
     }
 }
 
