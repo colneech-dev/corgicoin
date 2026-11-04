@@ -2014,6 +2014,14 @@ bool InvalidateBlock(CBlockIndex* pindex, string& strError)
         return false;
     }
 
+    // Test hook, regtest only: die here, after the marker is saved and before the rollback, as a power cut
+    // would, so rpc_invalidateblock_recovery.py can check that RecoverInvalidatedTip() finishes the job.
+    if (fRegTest && GetBoolArg("-testcrashafterinvalidate"))
+    {
+        LogPrintf("InvalidateBlock: -testcrashafterinvalidate set, exiting before the rollback\n");
+        std::_Exit(1);
+    }
+
     // If the active chain contains the block, roll back to its last valid ancestor
     if (pindexBest->fFailedChain)
     {
