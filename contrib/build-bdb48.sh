@@ -26,6 +26,11 @@ case "$(uname -s)-$(uname -m)" in
     Darwin-arm64) EXTRA="--build=arm-apple-darwin --enable-posixmutexes" ;;
     Darwin-*) EXTRA="--enable-posixmutexes" ;;
 esac
+# configure's probes are 1990s C (implicit int, implicit declarations), which recent clang refuses; so the POSIX mutex probe fails
+if [ "$(uname -s)" = Darwin ]; then
+    export CFLAGS="${CFLAGS:-} -Wno-implicit-int -Wno-implicit-function-declaration -Wno-int-conversion"
+    export CXXFLAGS="${CXXFLAGS:-} -Wno-implicit-int -Wno-implicit-function-declaration -Wno-int-conversion"
+fi
 ../dist/configure --enable-cxx --disable-shared --disable-replication --with-pic --prefix="$PREFIX" $EXTRA
 make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)"
 make install_lib install_include
