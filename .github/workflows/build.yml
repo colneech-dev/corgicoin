@@ -21,16 +21,18 @@ jobs:
             cmake \
             libboost-all-dev \
             libssl-dev \
-            libdb++-dev \
             libminiupnpc-dev \
             libzmq3-dev \
             python3-zmq
+
+      - name: Build Berkeley DB 4.8 (the one version every platform's wallet.dat uses)
+        run: contrib/build-bdb48.sh "$HOME/bdb48"
 
       - name: Build daemon
         run: |
           mkdir build && cd build
           # ZeroMQ is opt-in; turn it on here so feature_zmq.py runs instead of skipping
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_QT_GUI=OFF -DBUILD_TESTS=ON -DUSE_ZMQ=ON
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_QT_GUI=OFF -DBUILD_TESTS=ON -DUSE_ZMQ=ON -DBERKELEYDB_INCLUDE_DIR=$HOME/bdb48/include -DBERKELEYDB_LIBRARY=$HOME/bdb48/lib/libdb_cxx.a
           make -j$(nproc)
 
       - name: Run tests
@@ -83,7 +85,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install boost openssl@3 berkeley-db miniupnpc cmake
+          brew install boost openssl@3 miniupnpc cmake
+
+      - name: Build Berkeley DB 4.8 (the one version every platform's wallet.dat uses)
+        run: contrib/build-bdb48.sh "$HOME/bdb48"
 
       - name: Build daemon
         run: |
@@ -93,7 +98,7 @@ jobs:
             -DBUILD_QT_GUI=OFF \
             -DBUILD_TESTS=ON \
             -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3) \
-            -DBerkeleyDB_ROOT=$(brew --prefix berkeley-db)
+            -DBERKELEYDB_INCLUDE_DIR=$HOME/bdb48/include -DBERKELEYDB_LIBRARY=$HOME/bdb48/lib/libdb_cxx.a
           make -j$(sysctl -n hw.logicalcpu)
 
       - name: Run tests
@@ -129,7 +134,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install boost openssl@3 berkeley-db miniupnpc cmake qt
+          brew install boost openssl@3 miniupnpc cmake qt
+
+      - name: Build Berkeley DB 4.8 (the one version every platform's wallet.dat uses)
+        run: contrib/build-bdb48.sh "$HOME/bdb48"
 
       - name: Build Qt wallet
         run: |
@@ -139,7 +147,7 @@ jobs:
             -DBUILD_QT_GUI=ON \
             -DBUILD_TESTS=OFF \
             -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3) \
-            -DBerkeleyDB_ROOT=$(brew --prefix berkeley-db)
+            -DBERKELEYDB_INCLUDE_DIR=$HOME/bdb48/include -DBERKELEYDB_LIBRARY=$HOME/bdb48/lib/libdb_cxx.a
           make -j$(sysctl -n hw.logicalcpu) corgicoin-qt
 
       - name: Bundle Qt and every library into the app
