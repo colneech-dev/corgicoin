@@ -29,10 +29,11 @@ case "$(uname -s)" in
     MINGW*|MSYS*)       # a native build on Windows (MSYS2); the include is WinIoCtl.h in the source and winioctl.h on disk
         EXTRA="$EXTRA --enable-mingw"
         sed -i 's/WinIoCtl.h/winioctl.h/g' ../src/dbinc/win_db.h ;;
-    Darwin)             # configure's probes are 1990s C (implicit int, implicit declarations), which recent clang refuses
-        export CFLAGS="${CFLAGS:-} -Wno-implicit-int -Wno-implicit-function-declaration -Wno-int-conversion"
-        export CXXFLAGS="${CXXFLAGS:-} -Wno-implicit-int -Wno-implicit-function-declaration -Wno-int-conversion" ;;
 esac
+# the source and configure's probes are 1990s C (implicit int and declarations, mismatched function pointer types), which recent clang
+# and gcc 14 refuse as errors unless told they are warnings
+export CFLAGS="${CFLAGS:-} -Wno-implicit-int -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types"
+export CXXFLAGS="${CXXFLAGS:-} -Wno-implicit-int -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types"
 ../dist/configure --enable-cxx --disable-shared --disable-replication --with-pic --prefix="$PREFIX" $EXTRA
 make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)" libdb-5.3.a libdb_cxx-5.3.a
 mkdir -p "$PREFIX/include" "$PREFIX/lib"
