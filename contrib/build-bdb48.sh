@@ -19,10 +19,12 @@ cd db-4.8.30
 sed -i.old 's/__atomic_compare_exchange/__atomic_compare_exchange_db/' dbinc/atomic.h
 sed -i.old 's/atomic_init/atomic_init_db/' dbinc/atomic.h mp/mp_region.c mp/mp_mvcc.c mp/mp_fget.c mutex/mut_method.c mutex/mut_tas.c
 cd build_unix
-# the 2009 config.guess does not know Apple silicon: say what it is
+# the 2009 config.guess does not know Apple silicon: say what it is. Nor does BDB 4.8 have a spin lock for arm64 ("Unable to find a
+# mutex implementation"), so on a Mac it uses POSIX mutexes (process-shared, which macOS supports).
 EXTRA=
 case "$(uname -s)-$(uname -m)" in
-    Darwin-arm64) EXTRA="--build=arm-apple-darwin" ;;
+    Darwin-arm64) EXTRA="--build=arm-apple-darwin --enable-posixmutexes" ;;
+    Darwin-*) EXTRA="--enable-posixmutexes" ;;
 esac
 ../dist/configure --enable-cxx --disable-shared --disable-replication --with-pic --prefix="$PREFIX" $EXTRA
 make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)"
