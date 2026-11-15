@@ -17,7 +17,7 @@ tar xzf db.tar.gz
 cd db-5.3.28
 # the names clash with compiler builtins in gcc 5+ and clang
 for f in $(grep -rlE '__atomic_compare_exchange|atomic_init' src); do
-    perl -pi -e 's/__atomic_compare_exchange/__atomic_compare_exchange_db/g; s/\batomic_init\b/atomic_init_db/g' "$f"
+    sed -i.old -E 's/__atomic_compare_exchange/__atomic_compare_exchange_db/g; s/(^|[^_[:alnum:]])atomic_init([^_[:alnum:]]|$)/\1atomic_init_db\2/g' "$f"
 done
 cd build_unix
 EXTRA=
