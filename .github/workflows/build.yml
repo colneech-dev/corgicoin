@@ -271,6 +271,7 @@ jobs:
             mingw-w64-x86_64-db
             mingw-w64-x86_64-qt6-base
             mingw-w64-x86_64-miniupnpc
+            mingw-w64-x86_64-python
             make
 
       - name: Build daemon and Qt wallet
@@ -283,6 +284,9 @@ jobs:
             -DBUILD_TESTS=OFF \
             -DUSE_UPNP=OFF
           make -j$(nproc)
+
+      - name: Run functional tests (regtest) on Windows
+        run: python3 test/functional/test_runner.py --corgicoind build/corgicoind.exe -j 2
 
       - name: Upload Windows Qt wallet
         uses: actions/upload-artifact@v4
