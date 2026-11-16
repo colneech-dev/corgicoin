@@ -293,6 +293,8 @@ jobs:
             mingw-w64-x86_64-qt6-base
             mingw-w64-x86_64-miniupnpc
             mingw-w64-x86_64-python
+            mingw-w64-x86_64-python-pip
+            mingw-w64-x86_64-ninja
             mingw-w64-x86_64-zeromq
             make
 
@@ -317,20 +319,12 @@ jobs:
           cmake .. -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_QT_GUI=OFF -DBUILD_TESTS=OFF -DUSE_UPNP=OFF
           make -j$(nproc) corgicoind
 
-      # The tests run with the Windows Python, not MSYS2's: MSYS2 has no pyzmq for the MINGW64 environment, and feature_zmq.py must not be skipped.
-      # The daemons are MSYS2 builds, so their DLLs (MSYS2's mingw64/bin) are put on the path.
-      - name: Python for the functional tests
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
       - name: Run functional tests (regtest) on Windows
-        shell: pwsh
         run: |
-          python -m pip install pyzmq
-          $env:PATH = "${{ steps.msys.outputs.msys2-location }}\mingw64\bin;" + $env:PATH
-          $env:CORGICOIND_ALT = Join-Path (Split-Path $env:GITHUB_WORKSPACE) "prev\build\corgicoind.exe"
-          python test/functional/test_runner.py --corgicoind build\corgicoind.exe -j 2
+          # MSYS2 has no pyzmq package for the MINGW64 environment (only for UCRT64 and the clang ones), and feature_zmq.py must not be skipped:
+          # it is built from source against MSYS2's libzmq. (The Windows Python runs these tests about ten times slower.)
+          python3 -m pip install --break-system-packages pyzmq
+          CORGICOIND_ALT="$PWD/../prev/build/corgicoind.exe" python3 test/functional/test_runner.py --corgicoind build/corgicoind.exe -j 2
 
       - name: Upload Windows Qt wallet
         uses: actions/upload-artifact@v4
