@@ -94,7 +94,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install boost openssl@3 berkeley-db miniupnpc cmake zeromq pyzmq
+          brew install boost openssl@3 berkeley-db miniupnpc cmake zeromq
+          python3 -m pip install --break-system-packages pyzmq
 
       - name: Build daemon
         run: |
