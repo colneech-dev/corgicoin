@@ -312,7 +312,7 @@ jobs:
         run: |
           # from source, not the released daemon: that one is cross-built with Berkeley DB 4.8, and a data directory written by this build's
           # (newer) Berkeley DB cannot be opened by it. Update the tag with each release.
-          git clone --depth 1 --branch v4.9.0.0 https://github.com/corgicoin/corgicoin.git ../prev
+          mkdir ../prev && curl -fsSL https://github.com/corgicoin/corgicoin/archive/refs/tags/v4.9.0.0.tar.gz | tar xz -C ../prev --strip-components=1
           mkdir ../prev/build && cd ../prev/build
           cmake .. -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_QT_GUI=OFF -DBUILD_TESTS=OFF -DUSE_UPNP=OFF
           make -j$(nproc) corgicoind
