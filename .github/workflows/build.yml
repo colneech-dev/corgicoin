@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [master]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
   build-linux:
     runs-on: ubuntu-24.04
@@ -38,8 +42,15 @@ jobs:
           cd build
           ./test_corgicoin
 
+      - name: Fetch the last release (the second build for feature_cross_binary.py)
+        run: |
+          # update the version and the checksum (SHA256SUMS of the release) with each release
+          curl -fsSL -o prev.tar.gz https://github.com/corgicoin/corgicoin/releases/download/v4.9.0.0/corgicoin-v4.9.0.0-linux-x64.tar.gz
+          echo "611280688d03f440946d124123ba3105c675edb69b5b87416fa9afb2f24611c9  prev.tar.gz" | sha256sum -c -
+          mkdir prev && tar xzf prev.tar.gz -C prev
+
       - name: Run functional tests (regtest)
-        run: python3 test/functional/test_runner.py --corgicoind build/corgicoind
+        run: CORGICOIND_ALT="$PWD/prev/corgicoin-v4.9.0.0-linux-x64/corgicoind" python3 test/functional/test_runner.py --corgicoind build/corgicoind
 
       - name: Upload Linux daemon
         uses: actions/upload-artifact@v4
@@ -76,14 +87,14 @@ jobs:
           ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=print_stacktrace=1 ./test_corgicoin --run_test='!DoS_tests/DoS_checkSig'
 
   build-macos:
-    runs-on: macos-15
+    runs-on: ${{ vars.MACOS_RUNNER || 'macos-15' }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
 
       - name: Install dependencies
         run: |
-          brew install boost openssl@3 berkeley-db miniupnpc cmake
+          brew install boost openssl@3 berkeley-db miniupnpc cmake zeromq pyzmq
 
       - name: Build daemon
         run: |
@@ -92,6 +103,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_QT_GUI=OFF \
             -DBUILD_TESTS=ON \
+            -DUSE_ZMQ=ON \
             -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3) \
             -DBerkeleyDB_ROOT=$(brew --prefix berkeley-db)
           make -j$(sysctl -n hw.logicalcpu)
@@ -101,8 +113,15 @@ jobs:
           cd build
           ./test_corgicoin
 
+      - name: Fetch the last release (the second build for feature_cross_binary.py)
+        run: |
+          # update the version and the checksum (SHA256SUMS of the release) with each release
+          curl -fsSL -o prev.tar.gz https://github.com/corgicoin/corgicoin/releases/download/v4.9.0.0/corgicoin-v4.9.0.0-macos-arm64.tar.gz
+          echo "011e991a69f27fc0e6c930fb86dba3840df01e76caa59f5af0c582ec0ac554bb  prev.tar.gz" | shasum -a 256 -c -
+          mkdir prev && tar xzf prev.tar.gz -C prev
+
       - name: Run functional tests (regtest)
-        run: python3 test/functional/test_runner.py --corgicoind build/corgicoind
+        run: CORGICOIND_ALT="$PWD/prev/corgicoin-v4.9.0.0-macos-arm64/corgicoind" python3 test/functional/test_runner.py --corgicoind build/corgicoind
 
       - name: Bundle its libraries (runs on a Mac without Homebrew)
         run: |
@@ -122,7 +141,7 @@ jobs:
           path: build/corgicoind
 
   build-macos-qt:
-    runs-on: macos-15
+    runs-on: ${{ vars.MACOS_RUNNER || 'macos-15' }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
@@ -272,6 +291,8 @@ jobs:
             mingw-w64-x86_64-qt6-base
             mingw-w64-x86_64-miniupnpc
             mingw-w64-x86_64-python
+            mingw-w64-x86_64-python-pyzmq
+            mingw-w64-x86_64-zeromq
             make
 
       - name: Build daemon and Qt wallet
@@ -282,11 +303,21 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_QT_GUI=ON \
             -DBUILD_TESTS=OFF \
-            -DUSE_UPNP=OFF
+            -DUSE_UPNP=OFF \
+            -DUSE_ZMQ=ON
           make -j$(nproc)
 
+      - name: Build the last release (the second build for feature_cross_binary.py)
+        run: |
+          # from source, not the released daemon: that one is cross-built with Berkeley DB 4.8, and a data directory written by this build's
+          # (newer) Berkeley DB cannot be opened by it. Update the tag with each release.
+          git clone --depth 1 --branch v4.9.0.0 https://github.com/corgicoin/corgicoin.git ../prev
+          mkdir ../prev/build && cd ../prev/build
+          cmake .. -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_QT_GUI=OFF -DBUILD_TESTS=OFF -DUSE_UPNP=OFF
+          make -j$(nproc) corgicoind
+
       - name: Run functional tests (regtest) on Windows
-        run: python3 test/functional/test_runner.py --corgicoind build/corgicoind.exe -j 2
+        run: CORGICOIND_ALT="$PWD/../prev/build/corgicoind.exe" python3 test/functional/test_runner.py --corgicoind build/corgicoind.exe -j 2
 
       - name: Upload Windows Qt wallet
         uses: actions/upload-artifact@v4
