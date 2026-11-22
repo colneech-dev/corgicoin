@@ -64,8 +64,9 @@ exercised (`-forkheight` style override on regtest, as the other forks have).
 ## Open questions for the maintainers
 
 1. Is anyone going to use time locks? (If not, the rules cost nothing but a release and a flag day, and there is no hurry.)
-2. Pay-to-script-hash is never used in the history. Is it enforced in blocks? CLTV and CSV are only practical inside it, so this has
-   to be confirmed (and tested) before anything is announced.
+2. Pay-to-script-hash is never used in the history, but it is enforced in blocks: `ConnectBlock` sets `fStrictPayToScriptHash` from the
+   BIP 16 switch time (1 October 2012, long before this chain), so it is always on. CLTV and CSV scripts can sit inside it. (Whether
+   `IsStandard` relays such outputs still has to be checked; see 3.)
 3. Relay policy for version 2 transactions and for the new opcodes (`IsStandard`).
 4. H, and the release it ships in.
 
